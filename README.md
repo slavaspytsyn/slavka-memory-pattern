@@ -205,7 +205,7 @@ Originally described in [Claude Code Issue #24718](https://github.com/anthropics
 
 This system was inspired by ideas and discussions from:
 - RAG and retrieval-augmented patterns from the AI engineering community
-- [ukr-koder](https://github.com/ukr-koder) — Claude Code workflow ideas
+- [ukr-coder](https://github.com/ukr-coder) — Claude Code workflow ideas
 - Claude Code community discussions and [Issue #24718](https://github.com/anthropics/claude-code/issues/24718)
 
 ## License

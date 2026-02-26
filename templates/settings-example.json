@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__memory__memory_recall",
+      "mcp__memory__memory_status",
+      "mcp__memory__memory_store"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude-memory/security-hook.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude-memory/log.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude-memory/pre-session.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude-memory/post-session.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

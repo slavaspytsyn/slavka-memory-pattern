@@ -1,246 +1,246 @@
-# Slavka Memory System
+# SMP — System Architecture
 
-> Персистентная двухуровневая память с dependency awareness для AI-агентов.
-> Версия: 2.0 | Февраль 2026
-
----
-
-## Проблема
-
-AI-агенты (Claude Code, Cursor, Copilot) работают без памяти между сессиями и без понимания связей в проекте. Каждая сессия начинается с нуля. Агент видит файлы, но не видит зависимости — меняет API endpoint, не зная что от него зависят 3 бота.
-
-Результат: сломанные зависимости, потерянные решения, повторяющиеся ошибки, огромный расход токенов на повторное объяснение контекста.
-
-## Решение
-
-Двухуровневая pointer-based система, где AI-агент:
-1. **Помнит** факты, решения, ошибки между сессиями (MCP Memory)
-2. **Видит зависимости** между проектами (SMP) и внутри проекта (CLAUDE.md)
-3. **Автоматически** получает контекст при старте и логирует действия
+> Persistent two-layer memory with dependency awareness for AI agents.
+> Version: 2.1
 
 ---
 
-## Архитектура
+## The Problem
 
-### Общая схема
+AI agents (Claude Code, Cursor, Copilot) have no memory between sessions and no understanding of project relationships. Every session starts from zero. The agent sees files but not dependencies — it changes an API endpoint without knowing that 3 other services depend on it.
+
+Result: broken dependencies, lost decisions, repeated mistakes, massive token waste re-explaining context.
+
+## The Solution
+
+A two-layer pointer-based system where the AI agent:
+1. **Remembers** facts, decisions, and lessons across sessions (MCP Memory)
+2. **Sees dependencies** between projects (SMP Cards) and within a project (CLAUDE.md)
+3. **Automatically** receives context at startup and logs actions during work
+
+---
+
+## Architecture
+
+### Overview
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    УРОВЕНЬ 1: ГЛОБАЛЬНЫЙ                │
-│                                                         │
+│                    LEVEL 1: GLOBAL                       │
+│                                                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
 │  │ Global       │  │ MCP Memory   │  │ goals.md      │  │
 │  │ CLAUDE.md    │  │ (PostgreSQL) │  │               │  │
-│  │              │  │              │  │ Цели и фокус  │  │
-│  │ Правила для  │  │ SMP-карточки │  │ на месяц/год  │  │
-│  │ всех сессий  │  │ Факты        │  │               │  │
-│  │ (конституция)│  │ Решения      │  │               │  │
-│  │              │  │ Задачи       │  │               │  │
+│  │              │  │              │  │ Priorities    │  │
+│  │ Rules for    │  │ SMP cards    │  │ and focus     │  │
+│  │ all sessions │  │ Facts        │  │ (month/year)  │  │
+│  │ (constitution│  │ Decisions    │  │               │  │
+│  │              │  │ Tasks        │  │               │  │
 │  └──────────────┘  └──────────────┘  └───────────────┘  │
 └─────────────────────────┬───────────────────────────────┘
                           │
           ┌───────────────┼───────────────┐
           ▼               ▼               ▼
 ┌─────────────────┐ ┌─────────────┐ ┌─────────────────┐
-│   Проект A      │ │  Проект B   │ │   Проект C      │
+│   Project A     │ │  Project B  │ │   Project C     │
 │                 │ │             │ │                 │
 │ CLAUDE.md:      │ │ CLAUDE.md:  │ │ CLAUDE.md:      │
-│ - Архитектура   │ │ - ...       │ │ - ...           │
-│ - Зависимости   │ │             │ │                 │
-│ - Команды       │ │             │ │                 │
-│ - Техдолг       │ │             │ │                 │
-│ - Бомбы         │ │             │ │                 │
+│ - Architecture  │ │ - ...       │ │ - ...           │
+│ - Dependencies  │ │             │ │                 │
+│ - Commands      │ │             │ │                 │
+│ - Tech debt     │ │             │ │                 │
+│ - Time bombs    │ │             │ │                 │
 └─────────────────┘ └─────────────┘ └─────────────────┘
 
-УРОВЕНЬ 2: ПРОЕКТНЫЙ
+                    LEVEL 2: PER-PROJECT
 ```
 
-### Pointer-based принцип
+### Pointer-Based Principle
 
-AI-агент НЕ читает весь код проекта. Вместо этого он читает **указатели** — компактные файлы, которые описывают что где лежит и что от чего зависит.
+The AI agent does NOT read all project code. Instead it reads **pointers** — compact files that describe what lives where and what depends on what.
 
 ```
-Без указателей:                    С указателями:
+Without pointers:                  With pointers:
 ┌──────────────────┐               ┌──────────────────┐
-│ AI читает всё    │               │ AI читает        │
-│                  │               │ CLAUDE.md (2KB)  │
-│ src/ (500 файлов)│               │                  │
-│ = 150K+ токенов  │               │ Знает:           │
-│ = нет понимания  │               │ - где что лежит  │
-│   зависимостей   │               │ - что от чего    │
-│                  │               │   зависит        │
-│                  │               │ - что нельзя     │
-│                  │               │   трогать        │
-│                  │               │ = 7K токенов     │
+│ AI reads         │               │ AI reads         │
+│ everything       │               │ CLAUDE.md (2KB)  │
+│                  │               │                  │
+│ src/ (500 files) │               │ Knows:           │
+│ = 150K+ tokens   │               │ - where things   │
+│ = no dependency  │               │   live           │
+│   awareness      │               │ - what depends   │
+│                  │               │   on what        │
+│                  │               │ - what not to    │
+│                  │               │   touch          │
+│                  │               │ = 7K tokens      │
 └──────────────────┘               └──────────────────┘
 ```
 
-### Два уровня зависимостей
+### Two Levels of Dependencies
 
-**Уровень 1: Между проектами (SMP — Slavka Memory Pattern)**
+**Level 1: Between Projects (SMP Cards)**
 
-SMP-карточки хранятся в MCP Memory с префиксом `[SMP]`. Каждая карточка — это узел в графе зависимостей между проектами.
+SMP cards are stored in MCP Memory with `[SMP]` prefix. Each card is a node in the dependency graph between projects.
 
 ```
-[SMP] Fragstat — production
-fragstat.org | contabo1
-core: ~/Projects/0326FRG_Fragment → CLAUDE.md
-bots: ~/Projects/_SEO_Fragment_Server_bots → CLAUDE.md
+[SMP] MyApp — production
+myapp.com | server1
+core: ~/Projects/MyApp → CLAUDE.md
+bots: ~/Projects/MyApp-Bots → CLAUDE.md
 
-связи:
-  bots → GET /api/tool/estimate (⚠️ менять формат = сломать ботов)
-  core + bots → contabo1 (общий PG, Redis, Docker)
-  secrets: GCP SM fragstat-*
+dependencies:
+  bots → GET /api/estimate (⚠️ changing format breaks bots)
+  core + bots → server1 (shared PostgreSQL, Redis, Docker)
 ```
 
-Когда AI видит эту карточку, он знает: изменение API Fragstat затронет ботов. Он спросит "обновить ботов тоже?" вместо того чтобы молча сломать.
+When the AI sees this card, it knows: changing the MyApp API will break the bots. It asks "update bots too?" instead of silently breaking them.
 
-**Уровень 2: Внутри проекта (CLAUDE.md)**
+**Level 2: Within a Project (CLAUDE.md)**
 
-Каждый проект имеет `CLAUDE.md` в корне с обязательными секциями:
-- Что это, статус, карта файлов
-- Архитектура и поток данных
-- Внешние зависимости (таблица: Сервис | Зачем | Платный | Что сломается)
-- Тикающие бомбы (токены с expiry, сертификаты с датами)
-- Техдолг и TODO
+Every project has a `CLAUDE.md` in its root with required sections:
+- Description, status, file map
+- Architecture and data flow
+- External dependencies (table: Service | Purpose | Paid | What breaks)
+- Time bombs (tokens with expiry dates, certificates)
+- Tech debt and TODOs
 
 ---
 
-## Компоненты
+## Components
 
 ### 1. MCP Memory Server
 
-Персистентное хранилище с гибридным поиском (Full-Text Search + Semantic/Vector).
+Persistent storage with hybrid search (Full-Text Search + Semantic/Vector).
 
-**Требования к серверу:**
+**Server requirements:**
 
-| Требование | Описание |
-|------------|----------|
-| Протокол | MCP (Model Context Protocol) — HTTP transport |
-| БД | PostgreSQL (или другая с поддержкой FTS + vector) |
-| Поиск | Гибридный: keyword (FTS) + semantic (embeddings) |
-| Безопасность | Не должен быть доступен из интернета (VPN или localhost) |
+| Requirement | Description |
+|-------------|------------|
+| Protocol | MCP (Model Context Protocol) — HTTP transport |
+| Database | PostgreSQL (or any DB with FTS + vector support) |
+| Search | Hybrid: keyword (FTS) + semantic (embeddings) |
+| Security | Must not be accessible from the internet (VPN or localhost) |
 
-**Обязательные MCP tools:**
+**Required MCP tools:**
 
-| Tool | Назначение |
-|------|-----------|
-| `memory_store` | Сохранить запись (content, type, importance, project, expiresIn) |
-| `memory_recall` | Поиск по запросу (hybrid/fts/vector), фильтры по project, type, importance |
-| `memory_forget` | Удалить запись по ID |
-| `memory_status` | Статистика системы (кол-во записей, статус БД) |
+| Tool | Purpose |
+|------|---------|
+| `memory_store` | Save a record (content, type, importance, project, expiresIn) |
+| `memory_recall` | Search by query (hybrid/fts/vector), filters by project, type, importance |
+| `memory_forget` | Delete a record by ID |
+| `memory_status` | System stats (record count, DB status) |
 
-Можно использовать любой MCP memory server, который предоставляет эти tools. Open-source варианты есть на GitHub — ищите "mcp memory server". Главное: поддержка semantic search (embeddings) и фильтрации по project/type.
+You can use any MCP memory server that provides these tools. The SMP server is included in `core/server/` — see [Quick Start in README](README.md).
 
-**Подключение к Claude Code:**
+**Connecting to Claude Code:**
 ```bash
 claude mcp add --transport http --scope user memory http://{YOUR_SERVER_URL}/mcp
 ```
 
-**Типы записей:**
-| Тип | Назначение | Пример |
-|-----|-----------|--------|
-| `context` | Факты, SMP-карточки | "API returns usernames in quotes, NOT with @" |
-| `decision` | Принятые решения | "Problem → Options → Choice → Why" |
-| `task` | TODO с дедлайнами | "TODO [~May]: rotate API keys" |
-| `error` | Ошибки и уроки | "db push on shared DB drops other tables" |
-| `code` | Переиспользуемые паттерны | Snippets, configurations |
-| `context` [REF] | Рефлексии и инсайты | "[REF] Growth is slow because content is expert-only, no personal stories" |
+**Record types:**
+| Type | Purpose | Example |
+|------|---------|---------|
+| `context` | Facts, SMP cards | "API returns usernames in quotes, NOT with @" |
+| `decision` | Decisions made | "Problem → Options → Choice → Why" |
+| `task` | TODOs with deadlines | "TODO [~May]: rotate API keys" |
+| `error` | Bugs and lessons | "db push on shared DB drops other tables" |
+| `code` | Reusable patterns | Snippets, configurations |
+| `context` [REF] | Reflections and insights | "[REF] Growth is slow because content is expert-only" |
 
-### 2. Global CLAUDE.md (Конституция)
+### 2. Global CLAUDE.md (Constitution)
 
-Файл `~/.claude/CLAUDE.md` — правила, которые действуют в КАЖДОЙ сессии Claude Code.
+File `~/.claude/CLAUDE.md` — rules that apply to EVERY Claude Code session.
 
-Содержит:
-- Язык общения и кода
-- Процедуру старта/конца сессии
-- Маршрутизацию памяти (что куда записывать)
-- Правила безопасности
-- Список проектов и серверов
-- Ссылки на гайды
+Contains:
+- Communication and code language
+- Session start/end procedures
+- Memory routing (what goes where)
+- Security rules
+- Project and server list
+- Links to guides
 
-Размер: ~190 строк. Правило: держать < 250 строк, детали выносить в гайды.
+Size: ~130–200 lines. Rule: keep under 250 lines, move details to separate guides.
 
-### 3. Project CLAUDE.md (Указатели проекта)
+### 3. Project CLAUDE.md (Pointers)
 
-Файл `CLAUDE.md` в корне каждого проекта. Читается когда AI начинает работать с проектом.
+File `CLAUDE.md` in the root of each project. Read when the AI starts working with a project.
 
-Обязательные секции:
-1. Описание (1-2 предложения)
-2. Статус
-3. Карта файлов (дерево с пояснениями)
-4. Архитектура / поток данных
-5. Команды (запуск, тесты, сборка, деплой)
-6. Принятые решения
-7. Секреты (где лежат, НЕ значения)
-8. Внешние зависимости (таблица)
-9. Техдолг / TODO
-10. Тикающие бомбы
+Required sections:
+1. Description (1-2 sentences)
+2. Status
+3. File map (tree with explanations)
+4. Architecture / data flow
+5. Commands (run, test, build, deploy)
+6. Key decisions
+7. Secrets (where they live, NOT values)
+8. External dependencies (table)
+9. Tech debt / TODOs
+10. Time bombs
 
-### 4. Автоматические хуки
+### 4. Automatic Hooks
 
-Четыре хука, подключенных через `~/.claude/settings.json`:
+Four hooks configured in `~/.claude/settings.json`:
 
 **SessionStart → `pre-session.sh`**
-При запуске Claude Code автоматически:
-- Определяет проект по текущей директории (CWD)
-- Инициализирует MCP-сессию
-- Загружает последнюю session summary
-- Загружает SMP-карточку проекта (если определён)
-- Читает git status и последние коммиты
-- Инжектирует всё в контекст разговора
+When Claude Code launches, automatically:
+- Detects project from working directory (CWD)
+- Initializes MCP session
+- Loads last session summary
+- Loads project SMP card (if detected)
+- Reads git status and recent commits
+- Injects everything into conversation context
 
 **PostToolUse → `log.sh`**
-После каждого действия AI автоматически:
-- Логирует Edit, Write, Bash, memory_store в raw-файл
-- Пропускает Read, Glob, Grep (шум)
-- Формат: `- HH:MM:SS [session_id] **Tool** | details`
-- Файл: `~/.claude-memory/raw/YYYY-MM-DD.md`
+After each AI action, automatically:
+- Logs Edit, Write, Bash, memory_store to a daily raw file
+- Skips Read, Glob, Grep (noise)
+- Format: `- HH:MM:SS [session_id] **Tool** | details`
+- File: `~/.claude-memory/raw/YYYY-MM-DD.md`
 
 **SessionEnd → `post-session.sh`**
-При завершении сессии автоматически:
-- Проверяет что raw-лог достаточно большой (20+ строк)
-- Строит auto-summary из последних действий
-- Сохраняет в MCP Memory
-- Debounce: не чаще раза в 30 минут
+When session ends, automatically:
+- Checks if raw log is large enough (20+ lines)
+- Builds auto-summary from recent actions
+- Saves to MCP Memory
+- Debounce: no more than once per 30 minutes
 
 **PreToolUse → security hook**
-Перед выполнением Bash-команд:
-- Блокирует команды с захардкоженными секретами
-- Пропускает легитимные gcloud secrets/iam команды
+Before Bash commands:
+- Blocks commands with hardcoded secrets
+- Allows legitimate gcloud secrets/iam commands
 
 ### 5. goals.md
 
-Файл `~/.claude-memory/goals.md` — фильтр приоритетов. Читается при каждом старте.
+File `~/.claude-memory/goals.md` — priority filter. Read at every startup.
 
-Формат:
+Format:
 ```
-## 2026 (year) — годовые цели
-## February 2026 (month) — фокус месяца
-## Current focus — что прямо сейчас
+## 2026 (year) — yearly goals
+## March 2026 (month) — monthly focus
+## Current focus — what's happening right now
 ```
 
 ### 6. Raw Logs
 
-Автоматический лог всех действий AI. Lifecycle: 14 дней, потом удаляются cron-ом.
+Automatic log of all AI actions. Lifecycle: 90 days, then auto-deleted.
 
-Используются для:
-- Восстановления контекста после перезапуска
-- Auto-summary в post-session хуке
-- Диагностики (что AI делал в прошлой сессии)
+Used for:
+- Restoring context after restart
+- Auto-summary in post-session hook
+- Diagnostics (what did the AI do last session)
 
-### 7. MEMORY_GUIDE.md
+### 7. Session Anchors
 
-Единый регламент системы памяти: форматы записей, шкалы importance/expiresIn, антипаттерны, чеклист качества. Читается перед любой работой с памятью.
+During long sessions, the agent automatically writes key moments (config edits, git commits, important decisions) to `session.md`. This file survives context compression and can be re-read to restore working memory.
 
 ---
 
-## Lifecycle сессии
+## Session Lifecycle
 
 ```
                     ┌──────────────────────┐
                     │    Claude Code        │
-                    │    запускается        │
+                    │    starts             │
                     └──────────┬───────────┘
                                │
                     ┌──────────▼───────────┐
@@ -250,7 +250,7 @@ claude mcp add --transport http --scope user memory http://{YOUR_SERVER_URL}/mcp
                     │  1. Detect project    │
                     │  2. Init MCP session  │
                     │  3. Recall summary    │
-                    │  4. Recall SMP        │
+                    │  4. Recall SMP card   │
                     │  5. Git context       │
                     │  6. Inject to chat    │
                     └──────────┬───────────┘
@@ -260,18 +260,18 @@ claude mcp add --transport http --scope user memory http://{YOUR_SERVER_URL}/mcp
                     │                       │
                     │  1. goals.md          │
                     │  2. memory_recall()   │
-                    │  3. CLAUDE.md проекта │
+                    │  3. Project CLAUDE.md │
                     │  4. Raw logs (tail)   │
                     └──────────┬───────────┘
                                │
                     ┌──────────▼───────────┐
-                    │      РАБОТА          │
+                    │       WORK            │
                     │                       │
-                    │  PostToolUse hook     │◄── raw log запись
-                    │  (каждое действие)    │    после каждого
+                    │  PostToolUse hook     │◄── raw log entry
+                    │  (every action)       │    after each
                     │                       │    Edit/Write/Bash
-                    │  memory_store()       │◄── решения, факты
-                    │  (по необходимости)   │    записываются сразу
+                    │  memory_store()       │◄── decisions, facts
+                    │  (as needed)          │    saved immediately
                     └──────────┬───────────┘
                                │
                     ┌──────────▼───────────┐
@@ -285,7 +285,7 @@ claude mcp add --transport http --scope user memory http://{YOUR_SERVER_URL}/mcp
                                │
                     ┌──────────▼───────────┐
                     │  Pattern Detection    │
-                    │  (AI, не хук)         │
+                    │  (AI, not a hook)     │
                     │                       │
                     │  1. Extract changed   │
                     │     files from log    │
@@ -298,231 +298,236 @@ claude mcp add --transport http --scope user memory http://{YOUR_SERVER_URL}/mcp
 
 ---
 
-## Pattern Detection (обнаружение закономерностей)
+## Pattern Detection
 
-Ключевой вопрос: **как система понимает, что нужно зафиксировать?**
+Key question: **how does the system know what to capture?**
 
-Хуки решают логистику (загрузка, логирование, сохранение). Но распознавание новых зависимостей и закономерностей — задача AI-агента, не скрипта.
+Hooks handle logistics (loading, logging, saving). But recognizing new dependencies and patterns is the AI agent's job, not the script's.
 
-### Проблема
+### The Problem
 
-"Записывай важное" — слишком размыто. AI-агент не знает что считать важным, если нет чётких критериев. После compact контекст размывается — и зависимость теряется.
+"Save important stuff" is too vague. The AI doesn't know what counts as important without clear criteria. After context compression, dependencies get lost.
 
-### Решение: триггеры + end-of-session analysis
+### Solution: Triggers + End-of-Session Analysis
 
-Два механизма работают вместе:
+Two mechanisms work together:
 
-**1. Триггеры реального времени (во время работы)**
+**1. Real-Time Triggers (during work)**
 
-Чёткие правила "если → то запиши":
+Clear rules — "if X happens, then write Y":
 
-| Если... | То записать | Куда | Тип |
-|---------|------------|------|-----|
-| Принято решение между 2+ вариантами | Проблема → Варианты → Выбор → Почему | MCP Memory | decision |
-| Подключён новый внешний сервис | Сервис + зачем + что сломается | CLAUDE.md проекта (внешние зависимости) | — |
-| Создана связь между проектами | Проект → Проект (что зависит) | MCP Memory (SMP) | context |
-| Обнаружен и починен баг | Что сломалось + причина + решение | MCP Memory | error |
-| Та же ошибка встречается повторно | Паттерн + как избежать | MCP Memory | error |
-| Изменён API endpoint / DB schema | Проверить SMP: кто это потребляет? | Обновить SMP если нужно | context |
-| Добавлен cron / scheduled task | Что + когда + expiry если есть | CLAUDE.md (тикающие бомбы) | — |
-| Изменена архитектура / стек | Обновить карту файлов и архитектуру | CLAUDE.md проекта | — |
-| Стратегическое обсуждение / рефлексия | Инсайт + контекст + импакт | MCP Memory [REF] | context |
+| If... | Then record | Where | Type |
+|-------|------------|-------|------|
+| Decision made between 2+ options | Problem → Options → Choice → Why | MCP Memory | decision |
+| New external service connected | Service + purpose + what breaks | Project CLAUDE.md (dependencies) | — |
+| Cross-project link created | Project → Project (what depends) | MCP Memory (SMP) | context |
+| Bug found and fixed | What broke + cause + fix | MCP Memory | error |
+| Same error occurs repeatedly | Pattern + how to avoid | MCP Memory | error |
+| API endpoint / DB schema changed | Check SMP: who consumes this? | Update SMP if needed | context |
+| Cron / scheduled task added | What + when + expiry if any | CLAUDE.md (time bombs) | — |
+| Architecture / stack changed | Update file map and architecture | Project CLAUDE.md | — |
+| Strategic discussion / reflection | Insight + context + impact | MCP Memory [REF] | context |
 
-AI-агент проверяет эти триггеры по ходу работы. Каждый триггер — конкретный, не субъективный.
+The AI agent checks these triggers during work. Each trigger is concrete, not subjective.
 
-**2. End-of-session analysis (в конце сессии)**
+**2. End-of-Session Analysis**
 
-Перед завершением AI-агент выполняет анализ:
-
-```
-Шаг 1: Извлечь изменённые файлы из raw log (дёшево, ~10 строк)
-        grep "Edit\|Write" raw.log → список путей
-
-Шаг 2: Cross-reference с указателями (~1K токенов)
-        Для каждого файла:
-        → Упоминается в SMP-карточках? Актуальна ли карточка?
-        → Упоминается в CLAUDE.md проекта? Актуален ли раздел?
-        → Это API / DB schema / config? Есть ли потребители?
-
-Шаг 3: Предложить обновления
-        → "api/estimate.ts изменён — в SMP указано что от него зависят 3 бота. Обновить SMP?"
-        → "Добавлен новый сервис Redis — добавить в секцию внешних зависимостей?"
-        → "Принято решение использовать esbuild — зафиксировать как decision?"
-```
-
-**Стоимость:** ~1-4K токенов (извлечение файлов бесплатно, cross-reference = 1 memory_recall + чтение CLAUDE.md).
-
-### Чего это не делает
-
-- Не анализирует содержимое кода (слишком дорого по токенам)
-- Не определяет implicit-зависимости (import chains, runtime calls)
-- Не заменяет человека — только **предлагает**, решение за пользователем
-
-### Пример
+Before finishing, the AI agent runs analysis:
 
 ```
-Session: разработчик попросил изменить формат ответа /api/products
+Step 1: Extract changed files from raw log (cheap, ~10 lines)
+        grep "Edit\|Write" raw.log → list of paths
 
-Во время работы:
-  AI видит триггер "Изменён API endpoint"
-  → memory_recall("[SMP]") → находит: "bots → GET /api/products (⚠️ breaks bots)"
-  → AI спрашивает: "Этот endpoint потребляют боты. Обновить их тоже?"
+Step 2: Cross-reference with pointers (~1K tokens)
+        For each file:
+        → Mentioned in SMP cards? Is the card up to date?
+        → Mentioned in project CLAUDE.md? Is the section current?
+        → Is it an API / DB schema / config? Any consumers?
 
-В конце сессии:
+Step 3: Propose updates
+        → "api/estimate.ts changed — SMP says 3 bots depend on it. Update SMP?"
+        → "Added Redis — add to external dependencies section?"
+        → "Decided to use esbuild — record as decision?"
+```
+
+**Cost:** ~1-4K tokens (file extraction is free, cross-reference = 1 memory_recall + reading CLAUDE.md).
+
+### What This Does NOT Do
+
+- Does not analyze code content (too expensive in tokens)
+- Does not detect implicit dependencies (import chains, runtime calls)
+- Does not replace humans — only **proposes**, the user decides
+
+### Example
+
+```
+Session: developer asked to change /api/products response format
+
+During work:
+  AI sees trigger "API endpoint changed"
+  → memory_recall("[SMP]") → finds: "bots → GET /api/products (⚠️ breaks bots)"
+  → AI asks: "This endpoint is consumed by bots. Update them too?"
+
+End of session:
   Raw log: Edit api/products.ts, Edit bots/price-bot.ts, Edit bots/alert-bot.ts
-  Cross-reference: api/products.ts есть в SMP → всё обновлено? Да
-  → Предложение: "SMP актуальна, обновления не нужны"
+  Cross-reference: api/products.ts is in SMP → everything updated? Yes
+  → Proposal: "SMP is up to date, no updates needed"
 ```
 
 ---
 
-## Эволюция
+## Memory Routing
 
-### v0: Нет памяти
-Каждая сессия Claude Code — с чистого листа. Повторное объяснение контекста каждый раз. ~150K токенов на сессию.
+| Information | Where | Why |
+|-------------|-------|-----|
+| Rule for EVERY session | Global CLAUDE.md | Always read at startup |
+| Rule for ONE project | Project CLAUDE.md | Read when working on that project |
+| Fact / decision / event | MCP Memory | Searched on demand, doesn't load context |
+| Cross-project link | MCP Memory (SMP) | Instant overview at startup |
+| Task with deadline | MCP Memory (task) | Surfaces on recall, expires |
+| Insight / reflection | MCP Memory ([REF]) | Strategic conclusions from discussions |
+| Goals and focus | goals.md | Priority filter |
+| Action log | Raw logs | Written by hooks automatically |
 
-### v1: Token optimization
-Добавлен CLAUDE.md в проекты как pointer-файл. AI читает указатели вместо всего кода. Расход: 150K → ~7K токенов.
-
-### v1.5: Persistent memory
-Добавлен MCP Memory Server на GCP VM. AI запоминает факты, решения, ошибки между сессиями. SSH/stdio транспорт (до 2 сессий одновременно).
-
-### v1.6: HTTP transport
-Миграция с SSH/stdio на HTTP через Tailscale. Решена проблема deadlock при 3+ одновременных сессиях. Один процесс Node.js обслуживает все сессии.
-
-### v2.0: Dependency awareness
-Введены SMP-карточки — граф зависимостей между проектами. Двухуровневая архитектура: глобальные зависимости (SMP) + локальные (CLAUDE.md). Автоматические хуки: pre-session, post-session, raw-log, security. Полная система с регламентом (MEMORY_GUIDE.md).
-
-### v2.1: Reflection capture
-Добавлен формат [REF] — захват инсайтов из стратегических обсуждений. Система расширена за рамки кода: фиксирует не только решения (что выбрали), но и понимание, которое к ним приводит (почему буксует, что не работает, какой паттерн повторяется). Триггеры: рефлексия пользователя, стратегический разговор, смена понимания.
+**Routing principle: "Who will read this, and when?"**
 
 ---
 
-## Маршрутизация: что куда записывать
+## Memory Hygiene
 
-| Информация | Куда | Почему |
-|------------|------|--------|
-| Правило для КАЖДОЙ сессии | Global CLAUDE.md | Читается всегда при старте |
-| Правило для ОДНОГО проекта | CLAUDE.md проекта | Читается при работе с проектом |
-| Факт / решение / событие | MCP Memory | Ищется по запросу, не грузит контекст |
-| Связь между проектами | MCP Memory (SMP) | Мгновенный обзор при старте |
-| Задача с дедлайном | MCP Memory (task) | Всплывает при recall, протухает |
-| Инсайт / рефлексия | MCP Memory ([REF]) | Стратегические выводы из обсуждений |
-| Цели и фокус | goals.md | Фильтр приоритетов |
-| Автолог действий | Raw logs | Пишется хуками автоматически |
+The memory system degrades without maintenance: records become outdated, duplicate files, lose relevance. Hygiene is a required part of the lifecycle.
 
-**Принцип маршрутизации: "Кто это будет читать и когда?"**
+### When to Clean
 
----
+- At the end of long sessions (20+ actions)
+- During memory audits (on user request)
+- When working on a project — if stale data is noticed
 
-## Гигиена памяти (чистка)
+### What to Look For
 
-Система памяти деградирует без обслуживания: записи устаревают, дублируют файлы, теряют актуальность. Гигиена — обязательная часть lifecycle.
+| Problem | How to find | What to do |
+|---------|------------|------------|
+| **Duplicate with file** | Decision/fact already in CLAUDE.md or spec → why is it in memory? | `memory_forget`. Keep only a reference if needed |
+| **Outdated** | Fact has changed since recording | `memory_forget` + `memory_store` new one, or just delete |
+| **Inflated importance** | Minor item with importance=9 (9-10 only for architecture/SMP/goals) | Recreate with correct importance |
+| **Session noise** | Operational details ("replied X, discussed Y") | `memory_forget`. Valuable decision → separate record |
+| **Duplicate records** | Two memories about the same thing | Keep the more complete one, delete the other |
 
-### Когда чистить
+### Principle
 
-- В конце длинных сессий (20+ действий)
-- При аудите памяти (по запросу пользователя)
-- При работе с проектом — если замечен мусор по этому проекту
+**Files = source of truth. Memory = index + facts without a permanent file.**
 
-### Что искать
+If information exists in a project file (CLAUDE.md, specs, logs) — store only a reference in memory, don't duplicate the content.
 
-| Проблема | Как найти | Что делать |
-|----------|----------|------------|
-| **Дубль с файлом** | Решение/факт уже в CLAUDE.md или спеке → зачем в памяти? | `memory_forget`. Оставить только ссылку, если нужна |
-| **Устаревшее** | Факт изменился с момента записи | `memory_forget` + `memory_store` новую, или просто удалить |
-| **Завышенный importance** | Мелочь с importance=9 (9-10 только для архитектуры/SMP/целей) | Пересоздать с правильным importance |
-| **Сессионный мусор** | Операционные детали ("ответил X, обсудили Y") | `memory_forget`. Ценное решение → отдельная запись |
-| **Дубли между записями** | Два memory про одно и то же | Оставить более полную, удалить вторую |
+### Procedure
 
-### Принцип
-
-**Файлы = источник правды. Память = индекс + факты без постоянного файла.**
-
-Если информация есть в файле проекта (CLAUDE.md, SYSTEM_SPEC, BUILD_LOG) — в памяти хранить только ссылку, не дублировать содержание.
-
-### Процедура
-
-1. `memory_recall` по проекту (limit=20)
-2. Для каждой записи: "это ещё актуально? это не дублирует файл?"
-3. Предложить пользователю список на удаление (таблица: ID, содержание, причина)
-4. Удалить после подтверждения
+1. `memory_recall` by project (limit=20)
+2. For each record: "Is this still current? Does it duplicate a file?"
+3. Propose deletion list to user (table: ID, content, reason)
+4. Delete after confirmation
 
 ---
 
-## Инфраструктура
+## Deployment Options
 
-### Варианты развёртывания MCP Server
-
-**Вариант 1: Облачная VM (рекомендуется для нескольких устройств)**
+**Option 1: Remote Server (recommended for multiple devices)**
 ```
 Device 1 (Claude Code) ──┐
-Device 2 (Claude Code) ──┼── VPN ──→ VM (MCP Server + PostgreSQL)
-Device 3 (Claude Code) ──┘
+Device 2 (Gemini CLI)  ──┼── VPN ──→ Server (MCP Server + PostgreSQL)
+Device 3 (Cursor)      ──┘
 ```
-- Одна БД, доступная со всех устройств
-- VPN (Tailscale/WireGuard) для безопасности — порт НЕ открыт в интернет
-- Минимальные требования: 1 vCPU, 1GB RAM (e2-micro / $5-7/мес)
+- One database accessible from all devices
+- VPN (Tailscale/WireGuard) for security — port NOT open to the internet
+- Minimum requirements: 1 vCPU, 1GB RAM ($5-7/month)
 
-**Вариант 2: Localhost (одно устройство)**
+**Option 2: Localhost (single device)**
 ```
-Mac ──→ localhost:3100 (MCP Server + PostgreSQL)
+Your machine ──→ localhost:3100 (MCP Server + PostgreSQL)
 ```
-- Проще всего — всё на одной машине
-- Минус: память не доступна с других устройств
+- Simplest setup — everything on one machine
+- Downside: memory not accessible from other devices
 
-### Рекомендации
+**Option 3: Docker (recommended for quick start)**
+```bash
+cd core/server && docker compose up -d
+```
+- PostgreSQL + MCP Server in containers
+- Works out of the box with FTS-only mode
+- Add `OPENAI_API_KEY` or Vertex AI credentials for semantic search
 
-- **Бэкапы** — ежедневный pg_dump, хранить минимум в 2 местах
-- **Health check** — cron каждые 5 мин, алерт при падении (Telegram/email)
-- **Auto-restart** — systemd (Linux) или launchd (macOS)
+### Recommendations
 
-### Зависимости
+- **Backups** — daily pg_dump, store in at least 2 locations
+- **Health check** — cron every 5 min, alert on failure
+- **Auto-restart** — systemd (Linux) or launchd (macOS)
 
-- **MCP Server** — любой, поддерживающий memory_store/recall/forget/status
-- **PostgreSQL** — хранение записей (или другая БД с FTS + vector)
-- **Embeddings API** — для семантического поиска (Vertex AI, OpenAI, или локальная модель)
-- **Claude Code hooks** — SessionStart, SessionEnd, PostToolUse, PreToolUse
+### Dependencies
+
+- **MCP Server** — any server supporting memory_store/recall/forget/status
+- **PostgreSQL** — record storage (or any DB with FTS + vector)
+- **Embeddings API** — for semantic search (Vertex AI, OpenAI, or local model). Optional — FTS-only mode works without it
+- **Agent hooks** — SessionStart, SessionEnd, PostToolUse, PreToolUse
 
 ---
 
-## Ключевые концепции
+## Key Concepts
 
-### SMP (Slavka Memory Pattern)
-Карточки связей между проектами в MCP Memory. Префикс `[SMP]`. ~300-400 символов. Главная ценность — **что сломается** при изменениях. Таких карточек мало (5-10), но impactвысокий.
+### SMP (Structured Memory Pattern)
+Dependency cards between projects in MCP Memory. Prefix `[SMP]`. ~300-400 characters. Core value — **what breaks** when things change. Few cards (5-10), but high impact.
 
-### Pointer-based подход
-AI читает компактные указатели (CLAUDE.md, SMP-карточки) вместо сканирования всего кода. Файл на 2KB описывает проект из 500 файлов. Агент знает куда смотреть, а не пытается понять всё.
+### Pointer-Based Approach
+The AI reads compact pointers (CLAUDE.md, SMP cards) instead of scanning all code. A 2KB file describes a 500-file project. The agent knows where to look instead of trying to understand everything.
 
-### Dependency graph
-Двухуровневый граф зависимостей:
-- **Глобальный** (SMP): проект → проект, проект → сервис
-- **Локальный** (CLAUDE.md): модуль → модуль, API → потребители
+### Dependency Graph
+Two-level dependency graph:
+- **Global** (SMP): project → project, project → service
+- **Local** (CLAUDE.md): module → module, API → consumers
 
-AI видит связи ДО того как начнёт менять код.
+The AI sees connections BEFORE it starts changing code.
 
 ---
 
-## Стек и инструменты
+## Evolution
 
-| Компонент | Технология | Ссылка |
-|-----------|-----------|--------|
+### v0: No Memory
+Every Claude Code session starts from scratch. Re-explaining context every time. ~150K tokens per session.
+
+### v1: Token Optimization
+Added CLAUDE.md to projects as pointer files. AI reads pointers instead of all code. Usage: 150K → ~7K tokens.
+
+### v1.5: Persistent Memory
+Added MCP Memory Server. AI remembers facts, decisions, and errors across sessions. SSH/stdio transport (up to 2 concurrent sessions).
+
+### v1.6: HTTP Transport
+Migrated from SSH/stdio to HTTP over VPN. Solved deadlock issues with 3+ concurrent sessions. Single Node.js process serves all sessions.
+
+### v2.0: Dependency Awareness
+Introduced SMP cards — a dependency graph between projects. Two-layer architecture: global dependencies (SMP) + local (CLAUDE.md). Automatic hooks: pre-session, post-session, raw-log, security.
+
+### v2.1: Reflection Capture
+Added [REF] format — capturing insights from strategic discussions. System expanded beyond code: captures not just decisions (what was chosen), but the understanding that led to them (why something isn't working, what pattern keeps repeating).
+
+---
+
+## Tech Stack
+
+| Component | Technology | Link |
+|-----------|-----------|------|
 | MCP Protocol | Model Context Protocol (Anthropic) | https://modelcontextprotocol.io |
 | MCP SDK | @modelcontextprotocol/sdk | https://github.com/modelcontextprotocol/typescript-sdk |
-| Claude Code | CLI для Claude (Anthropic) | https://docs.anthropic.com/en/docs/claude-code |
+| Claude Code | CLI for Claude (Anthropic) | https://docs.anthropic.com/en/docs/claude-code |
 | Claude Code Hooks | Event-driven hooks system | https://docs.anthropic.com/en/docs/claude-code/hooks |
-| Vertex AI | Embeddings (textembedding-gecko) | https://cloud.google.com/vertex-ai |
-| Tailscale | WireGuard-based VPN | https://tailscale.com |
-| PostgreSQL | Database | https://www.postgresql.org |
+| Embeddings | OpenAI / Vertex AI / FTS-only | Configurable via EMBEDDING_PROVIDER |
+| VPN | Tailscale / WireGuard | https://tailscale.com |
+| PostgreSQL | Database + pgvector | https://www.postgresql.org |
 
 ---
 
-## Метрики
+## Metrics
 
-| Метрика | До системы | После |
-|---------|-----------|-------|
-| Токены на сессию | ~150K | ~7K |
-| Контекст между сессиями | Нет | Полный |
-| Сломанные зависимости | Регулярно | Редко (AI спрашивает) |
-| Время на старт сессии | 5-10 мин объяснений | Автоматически |
-| Записей в памяти | 0 | ~41 |
+| Metric | Before SMP | After SMP |
+|--------|-----------|-----------|
+| Tokens per session for context | ~150K | ~7K |
+| Cross-session memory | None | Full |
+| Broken dependencies | Regular | Rare (agent asks first) |
+| Session startup time | 5-10 min explaining | Automatic |

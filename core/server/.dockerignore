@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.git
+.gitignore
+*.md
+Dockerfile
+docker-compose.yml
+install.sh
+npm-debug.log

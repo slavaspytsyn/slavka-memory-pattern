@@ -1,0 +1,35 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smp_db}
+      POSTGRES_USER: ${POSTGRES_USER:-smp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smp_pass_change_me}
+    volumes:
+      - smp_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smp_user} -d ${POSTGRES_DB:-smp_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  server:
+    build: .
+    ports:
+      - "${LISTEN_PORT:-3100}:3100"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-smp_user}:${POSTGRES_PASSWORD:-smp_pass_change_me}@db:5432/${POSTGRES_DB:-smp_db}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-none}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
+      VERTEX_AI_LOCATION: ${VERTEX_AI_LOCATION:-us-central1}
+      LISTEN_PORT: "3100"
+      STATUS_FILE_PATH: ${STATUS_FILE_PATH:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  smp_data:

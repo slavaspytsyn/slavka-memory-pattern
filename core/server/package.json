@@ -1,0 +1,46 @@
+{
+  "name": "smp-server",
+  "version": "0.1.0-alpha",
+  "description": "MCP memory server with hybrid search (FTS + vector) for AI agents",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "migrate": "tsx src/database/migrate.ts",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "smp",
+    "mcp",
+    "memory",
+    "postgresql",
+    "embeddings",
+    "ai-agents"
+  ],
+  "author": "Viacheslav Spitsyn",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "pgvector": "^0.2.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "optionalDependencies": {
+    "@google-cloud/aiplatform": "^3.34.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
